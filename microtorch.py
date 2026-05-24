@@ -208,6 +208,37 @@ class MLP:
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]
 
+class Adam:
+
+    def __init__(self,params,lr=0.01,beta1=0.9,beta2=0.9):
+        self.params=params
+        self.lr=lr
+        self.m={}
+        self.v={}
+        self.t=1
+        self.beta1=beta1
+        self.beta2=beta2
+        for p in self.params:
+            if p not in self.m:
+                self.m[p]=np.zeros_like(p.data)
+            if p not in self.v:
+                self.v[p]=np.zeros_like(p.data)
+        
+    def step(self): 
+        for p in self.params:
+            m = self.beta1 * self.m[p] + (1 - self.beta1) * p.grad
+            v = self.beta2 * self.v[p] + (1 - self.beta2) * p.grad**2
+            self.m[p]=m
+            self.v[p]=v
+            m_corrected = self.m[p] / (1 - self.beta1**self.t)
+            v_corrected = self.v[p] / (1 - self.beta2**self.t)
+            p.data -= self.lr * m_corrected / (v_corrected)**0.5
+        self.t+=1
+    
+    def zero_grad(self):
+        for p in self.params:
+            p.grad = np.zeros_like(p.data)
+
 def MSE (ypred, ygt):
     if isinstance(ypred, list):
         return sum((yp - yt)**2 for yp, yt in zip(ypred, ygt)) * (1/len(ypred))
@@ -215,28 +246,25 @@ def MSE (ypred, ygt):
         ypred = ypred.squeeze() if ypred.data.ndim > 1 else ypred
         diff = ypred - ygt
         return (diff ** 2).sum() * (1 / ypred.data.shape[0])
+    
 
 if __name__ == "__main__":
     X = Tensor(np.array([
-    [2.0,  3.0, -1.0],
-    [3.0, -1.0,  0.5],
-    [0.5,  1.0,  1.0],
-    [1.0,  1.0, -1.0],
-]))
-ys = Tensor(np.array([1.0, -1.0, -1.0, 1.0]))
-mlp = MLP(3, [4, 4, 1], activation='tanh')
+        [2.0,  3.0, -1.0],
+        [3.0, -1.0,  0.5],
+        [0.5,  1.0,  1.0],
+        [1.0,  1.0, -1.0],
+    ]))
+    ys = Tensor(np.array([1.0, -1.0, -1.0, 1.0]))
 
-for step in range(30):
-    ypred = mlp(X)
-    print("ypred:", ypred.data)
-    print("ys:", ys.data)
-    loss = MSE(ypred, ys)
-    
-    for p in mlp.parameters():
-        p.grad = np.zeros_like(p.data)
-    loss.backward()
-    
-    for p in mlp.parameters():
-        p.data -= 0.05 * p.grad
-    
-    print(f"step {step:2d}, loss: {loss.data:.6f}")
+    mlp = MLP(3, [4, 4, 1], activation='tanh')
+
+    optimizer = Adam(mlp.parameters(), lr=0.01)
+
+    for step in range(30):
+        optimizer.zero_grad()
+        ypred = mlp(X)
+        loss = MSE(ypred, ys)
+        loss.backward()
+        optimizer.step()
+        print(f"step {step:2d}, loss: {loss.data:.6f}")
