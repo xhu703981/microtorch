@@ -1,1 +1,3 @@
 # microtorch
+Not an actual torch by any means......
+But perhaps sufficient for training a small neural net
